@@ -19,9 +19,7 @@ entity f_i2c_master is
 		o_ack_error : out std_ulogic;					--'1' if wrong acknowledge from slave
 		io_sclk : inout std_ulogic;						--serial clock; bidirectional line 
 		
-		--this signal is for verification purposed. does not exist in synth. -oriented code
-		i_sda : in std_ulogic;
-		--io_sda  : inout std_ulogic;						--serial data; bidirectional line
+		io_sda  : inout std_ulogic;						--serial data; bidirectional line
 		o_data : out std_ulogic_vector(7 downto 0));	--data read from slave
 end f_i2c_master;
 
@@ -58,8 +56,14 @@ architecture rtl of f_i2c_master is
 	signal cnt_bits : unsigned(2 downto 0);
 
 
-	signal io_sda : std_ulogic;
+	--signal io_sda : std_ulogic;
 	signal io_sclk_prev : std_ulogic;
+
+	--signal that help with verification (i2c slave functionality)
+	signal sda : std_ulogic := '0';	
+	signal data_rx : std_ulogic_vector(7 downto 0);
+	signal addr_rw : std_ulogic_vector(7 downto 0);
+	signal f_read_done : std_ulogic;
 begin
 	--create the data clock and the serial clock
 	data_clk_sclk : process(i_clk,i_arst_n)
@@ -231,13 +235,13 @@ begin
 							r_ack_error <= '0';
 						end if;
 					when slv_ack1 =>									--read ack from slave
-						if(i_sda /= '0' or r_ack_error = '1') then	--if wrong ack
+						if(sda /= '0' or r_ack_error = '1') then	--if wrong ack
 							r_ack_error <= '1';							--assert ack error
 						end if;
 					when rd =>
-						r_data_rx(to_integer(cnt_bits)) <= i_sda;		--read data from sda
+						r_data_rx(to_integer(cnt_bits)) <= sda;		--read data from sda
 					when slv_ack2 =>									--read ack from slave
-						if(i_sda /= '0' or r_ack_error = '1') then	--if wrong ack
+						if(sda /= '0' or r_ack_error = '1') then	--if wrong ack
 							r_ack_error <= '1';							--assert ack error
 						end if;
 					when stop =>										--deassert clk to out enable
@@ -261,4 +265,38 @@ begin
 
 	io_sclk <= '0' when (r_sclk_en = '1' and r_sclk = '0') else '1';
 	io_sda  <= '0' when (w_sda_en_n = '0') else '1';
+
+
+	--i2c slave basic functionality emulation (loopback)
+	process(i_clk,i_arst_n)
+	begin
+		if(i_arst_n = '0') then
+			sda <= '0';
+		elsif(rising_edge(i_clk)) then
+
+			if(io_sclk = '0' and io_sclk_prev = '1') then
+				case state is
+					when cmd =>
+						addr_rw(to_integer(cnt_bits)) <= r_sda;
+					when wr =>
+						data_rx(to_integer(cnt_bits+1)) <= r_sda;
+					when slv_ack2 =>
+						if(cnt_bits = 7) then
+							data_rx(0) <= r_sda;
+						end if;
+					when others=>
+						null;
+				end case;
+			elsif(io_sclk = '1' and io_sclk_prev = '0') then
+				case state is
+					when rd =>
+						sda <= data_rx(to_integer(cnt_bits));
+					when others =>
+						null;
+				end case;			
+			end if;
+		end if;
+	end process;
+
+	f_read_done <= '1' when (state = master_ack and i_ena = '1' and r_addr_rw /= i_addr & i_rw) else '0';
 end rtl;

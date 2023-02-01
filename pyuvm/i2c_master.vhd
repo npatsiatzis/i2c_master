@@ -1,13 +1,11 @@
---IIC (I2C) is a two-wire half-duplex data link
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity f_i2c_master is
+entity i2c_master is
 	generic(
-		g_sys_clk : natural := 400;				--system clock freq. in Hz
-		g_bus_clk : natural := 60);				--i2c (bus) speed in Hz
+		g_sys_clk : natural := 50_000_000;				--system clock freq. in Hz
+		g_bus_clk : natural := 400_000);				--i2c (bus) speed in Hz
 	port(
 		i_clk : in std_ulogic;							--system clock
 		i_arst_n : in std_ulogic;						--asynchronous active low reset
@@ -18,14 +16,11 @@ entity f_i2c_master is
 		o_busy : out std_ulogic;						--master busy, transaction in progress
 		o_ack_error : out std_ulogic;					--'1' if wrong acknowledge from slave
 		io_sclk : inout std_ulogic;						--serial clock; bidirectional line 
-		
-		--this signal is for verification purposed. does not exist in synth. -oriented code
-		i_sda : in std_ulogic;
-		--io_sda  : inout std_ulogic;						--serial data; bidirectional line
+		io_sda  : inout std_ulogic;						--serial data; bidirectional line
 		o_data : out std_ulogic_vector(7 downto 0));	--data read from slave
-end f_i2c_master;
+end i2c_master;
 
-architecture rtl of f_i2c_master is
+architecture rtl of i2c_master is
 	--create data and serial clock with 90 degress (quarter of a cycle) phase difference between them
 	constant bus_clk_div_4 : natural := g_sys_clk/g_bus_clk/4;
 	--distinguish between rising/falling edge of data clk for write/read sda purposes
@@ -55,11 +50,6 @@ architecture rtl of f_i2c_master is
 	--active low signal that enables the serial data line under construction to out
 	signal w_sda_en_n : std_ulogic;
 
-	signal cnt_bits : unsigned(2 downto 0);
-
-
-	signal io_sda : std_ulogic;
-	signal io_sclk_prev : std_ulogic;
 begin
 	--create the data clock and the serial clock
 	data_clk_sclk : process(i_clk,i_arst_n)
@@ -107,20 +97,19 @@ begin
 
 
 	i2c_master_fsm : process(i_clk,i_arst_n)
-		--variable cnt_bits : unsigned(2 downto 0);
+		variable cnt_bits : unsigned(2 downto 0);
 	begin
 		if(i_arst_n = '0') then				--if rst asserted
 			o_busy <= '1';					--i2c master busy, not available for transactions
 			state <= ready;					
-			cnt_bits <= (others => '1');	--inialize r/w pointer to msb
+			cnt_bits := (others => '1');	--inialize r/w pointer to msb
 			r_sda <= '1';					--do not drive sda
 			r_ack_error <= '0';				--clear acknowledge error
 			r_sclk_en <= '0';				--deassert enable for serial clock to out
 			o_data <= (others => '0');		--clear data read from slave
 		elsif(rising_edge(i_clk)) then
 			r_data_clk_prev <= r_data_clk;
-			io_sclk_prev <= io_sclk;
-			if(r_data_clk = '1' and r_data_clk_prev = '0') then	--rising edge of data clk
+			if(r_data_clk = '1' and r_data_clk_prev <= '0') then	--rising edge of data clk
 				case state is 
 					when ready =>
 						if(i_ena = '1') then						--if ready and valid data from user
@@ -140,23 +129,21 @@ begin
 						r_sda <= r_addr_rw(to_integer(cnt_bits));	--place the msb of the command on sda
 						o_busy <= '1';
 						state <= cmd;								--go to command state
-						cnt_bits <= cnt_bits -1;				--manage r/w pointer
 					when cmd =>										--send slave address and r/w msb first
 						o_busy <= '1';
 						if(cnt_bits >0) then						--if not whole command sent
-							cnt_bits <= cnt_bits -1;				--manage r/w pointer
+							cnt_bits := cnt_bits -1;				--manage r/w pointer
 							r_sda <= r_addr_rw(to_integer(cnt_bits));	--drive sda with data
 							state <= cmd;
 						else           								--if done sending the command
 							r_sda <= '1';							--deassert sda to read ack
-							cnt_bits <= (others => '1');			--reinitialize r/w pointer
+							cnt_bits := (others => '1');			--reinitialize r/w pointer
 							state <= slv_ack1;						--go to slave ack 1 state
 						end if;
 					when slv_ack1 =>
 						if(r_addr_rw(0) = '0') then					--if cmd lsb is 0 -> write
 							r_sda <= r_data(to_integer(cnt_bits));	--latch msb of data to sda
 							state <= wr;
-							cnt_bits <= cnt_bits -1;				--manage r/w pointer
 						else  										--if cmd lsb is 1 -> read
 							r_sda <= '1';							--deassert sda to read
 							state <= rd;
@@ -164,19 +151,18 @@ begin
 					when wr =>
 						o_busy <= '1';
 						if(cnt_bits >0) then						--if not all data written
-							cnt_bits <= cnt_bits -1;				--manage r/w pointer
+							cnt_bits := cnt_bits -1;				--manage r/w pointer
 							r_sda <= r_data(to_integer(cnt_bits));
 							state <= wr;
 						else  										--if data write transaction complete
-							cnt_bits <= (others => '1');			--reinitialize r/w pointer		
-							r_sda <= r_data(0);
-							--r_sda <= '1';							--deassert sda to read ack
+							cnt_bits := (others => '1');			--reinitialize r/w pointer		
+							r_sda <= '1';							--deassert sda to read ack
 							state <= slv_ack2;						
 						end if;
 					when rd =>
 						o_busy <= '1';
 						if (cnt_bits >0) then						--if not all bits read
-							cnt_bits <= cnt_bits -1;				--manage r/w pointer
+							cnt_bits := cnt_bits -1;				--manage r/w pointer
 							state <= rd;
 						else
 							--if read from slave complete and new read transaction from same slave
@@ -186,7 +172,7 @@ begin
 								r_sda <= '1';					--send no-acknowledge to slave
 																--sent when final read tran. with that slave
 							end if;
-							cnt_bits <= (others => '1');
+							cnt_bits := (others => '1');
 							o_data <= r_data_rx;					--data read from slave to output
 							state <= master_ack;					--go to master acknowledge state
 						end if;
@@ -231,13 +217,13 @@ begin
 							r_ack_error <= '0';
 						end if;
 					when slv_ack1 =>									--read ack from slave
-						if(i_sda /= '0' or r_ack_error = '1') then	--if wrong ack
+						if(io_sda /= '0' or r_ack_error = '1') then	--if wrong ack
 							r_ack_error <= '1';							--assert ack error
 						end if;
 					when rd =>
-						r_data_rx(to_integer(cnt_bits)) <= i_sda;		--read data from sda
+						r_data_rx(to_integer(cnt_bits)) <= io_sda;		--read data from sda
 					when slv_ack2 =>									--read ack from slave
-						if(i_sda /= '0' or r_ack_error = '1') then	--if wrong ack
+						if(io_sda /= '0' or r_ack_error = '1') then	--if wrong ack
 							r_ack_error <= '1';							--assert ack error
 						end if;
 					when stop =>										--deassert clk to out enable
@@ -259,6 +245,6 @@ begin
 					not r_data_clk_prev when stop,
 					r_sda when others;
 
-	io_sclk <= '0' when (r_sclk_en = '1' and r_sclk = '0') else '1';
-	io_sda  <= '0' when (w_sda_en_n = '0') else '1';
+	io_sclk <= '0' when (r_sclk_en = '1' and r_sclk = '0') else 'Z';
+	io_sda <= '0' when (w_sda_en_n = '0') else 'Z';
 end rtl;
