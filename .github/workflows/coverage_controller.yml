@@ -44,5 +44,5 @@ jobs:
       
     - name: Functional Coverage
       run: |
-        cd iwc_controller/ && var=$(cat coverage.xml | grep -o -E 'cover_percentage.{0,5}' | head -1 | cut -f2- -d\")
+        cd i2c_controller/ && var=$(cat coverage.xml | grep -o -E 'cover_percentage.{0,5}' | head -1 | cut -f2- -d\")
         if [ $var = 100 ]; then exit 0; else exit 1; fi
