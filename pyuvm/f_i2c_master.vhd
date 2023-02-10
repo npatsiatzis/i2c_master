@@ -277,12 +277,12 @@ begin
 			if(io_sclk = '0' and io_sclk_prev = '1') then
 				case state is
 					when cmd =>
-						addr_rw(to_integer(cnt_bits)) <= r_sda;
+						addr_rw(to_integer(cnt_bits)) <= io_sda;
 					when wr =>
-						data_rx(to_integer(cnt_bits+1)) <= r_sda;
+						data_rx(to_integer(cnt_bits+1)) <= io_sda;
 					when slv_ack2 =>
 						if(cnt_bits = 7) then
-							data_rx(0) <= r_sda;
+							data_rx(0) <= io_sda;
 						end if;
 					when others=>
 						null;

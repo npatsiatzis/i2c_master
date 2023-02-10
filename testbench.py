@@ -47,7 +47,7 @@ async def reset(dut,cycles=1):
 
 @cocotb.test()
 async def test(dut):
-	"""Check results and coverage for spi_master"""
+	"""Check results and coverage for i2c_master"""
 
 	cocotb.start_soon(Clock(dut.i_clk, period_ns, units="ns").start())
 	await reset(dut,5)	
@@ -71,7 +71,6 @@ async def test(dut):
 	dut.i_sda.value = sda
 	expected_value = inputs.data
 
-	# for i in range(1000):
 	while(full != True):
 		await RisingEdge(dut.i_clk)
 		dut.i_sda.value = sda

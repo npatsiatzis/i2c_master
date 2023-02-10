@@ -204,7 +204,7 @@ class Env(uvm_env):
 
 @pyuvm.test()
 class Test(uvm_test):
-    """Test UART rx-tx loopback with random values"""
+    """Test i2c rx-tx loopback with random values"""
 
     def build_phase(self):
         self.env = Env("env", self)
