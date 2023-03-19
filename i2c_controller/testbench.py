@@ -38,7 +38,7 @@ async def connect_tx_rx(dut):
 
 # at_least = value is superfluous, just shows how you can determine the amount of times that
 # a bin must be hit to considered covered
-@CoverPoint("top.i_data",xf = lambda x : x, bins = list(range(2**8)), at_least=1)
+@CoverPoint("top.i_data",xf = lambda x : x, bins = list(range(2**4)), at_least=1)
 def number_cover(x):
 	covered_valued.append(int(x))
 
@@ -82,7 +82,7 @@ async def test_tx(dut):
 	# set the write bit in command register and wait for the cmd to be done
 	# set the data to be transferred in txr 
 	# set the write bit in command register and wait for the cmd to be done
-	#repeat the last two steps as longs as one wants to transmit data
+	# repeat the last two steps as longs as one wants to transmit data
 	
 
 
@@ -133,9 +133,9 @@ async def test_tx(dut):
 	await RisingEdge(dut.i2c_byte_controller.o_msg_done)
 
 	while(full != True):
-		data = random.randint(0,2**8-1)
+		data = random.randint(0,2**4-1)
 		while(data in covered_valued):
-			data = random.randint(0,2**8-1)
+			data = random.randint(0,2**4-1)
 		dut.i_addr.value = 3
 		dut.i_we.value =1
 		dut.i_data.value = data

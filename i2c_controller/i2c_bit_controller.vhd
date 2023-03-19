@@ -1,3 +1,7 @@
+--module that works on bit-level on the i2c bus. It receives from the byte-level module
+--a symbol (i.e a part of an i2c message) that it then implements on the bit-level
+--by manipulating the serial clock (scl) and serial data (sda) lines.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -161,6 +165,7 @@ begin
 	o_scl <= '0';
 	o_sda <= '0';
 
+
 	gen_scl_en : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then
@@ -191,6 +196,22 @@ begin
 								when others =>
 									w_state <= IDLE;
 							end case;
+		                -- generate START symbol
+		                --	      1 | 2 | 3 | 4 |
+		                --        _______
+		                -- sda           \_______
+		                --        ___________
+		                -- scl               \___
+		                --
+
+		                -- generate REPEATED START symbol
+		                --	         1 | 2 | 3 | 4 |
+		                --       	   ______
+		                -- sda     ___/   	 \____
+		                --               ________
+		                -- scl    ______/        \___
+		                --
+
 						when START1 =>
 							w_state <= START2;
 							o_sda_en_n <= '1';
@@ -210,7 +231,16 @@ begin
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
 							o_sda_en_n <= '0';
+			
 							o_cmd_done <= '1';
+
+		                -- generate STOP symbol
+		                --	       1 | 2 | 3 | 4 |
+		                --       		    _____
+		                -- sda     ________/   
+		                --              ________
+		                -- scl    _____/
+		                --
 
 						when STOP1 =>	
 							w_state <= STOP2;
@@ -230,6 +260,16 @@ begin
 							o_sda_en_n <= '1';
 							o_cmd_done <= '1';
 
+
+		                -- generate READ symbol
+		                --	       1 | 2 | 3 | 4 |
+		                --       
+		                -- sda     XX============XX   
+		                --             _______
+		                -- scl    ____/       \___
+		                --
+
+
 						when READ1 =>
 							w_state <= READ2;
 							o_scl_en_n <= '0';
@@ -246,7 +286,17 @@ begin
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
 							o_sda_en_n <= i_rx;
+						
 							o_cmd_done <= '1';
+
+	                -- generate WRITE symbol
+		                --	       1 | 2 | 3 | 4 |
+		                --       
+		                -- sda     X============X   
+		                --             _______
+		                -- scl    ____/       \___
+		                --
+
 
 						when WRITE1 =>
 							w_state <= WRITE2;

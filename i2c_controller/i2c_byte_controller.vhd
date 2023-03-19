@@ -1,3 +1,10 @@
+--module that manages i2c transactions/messages (message = byte-level operation on the bus). 
+--each transaction may consist of one or more mesages 
+--(multiple messages possible when one wants to perform the same operation
+--on the same address). This module receives from the host interface the type of message and 
+--transaction and breaks down the message in "symbols" which are then 
+--implemeneted by a module that works on bit level on the i2c bus (i2c_bit_controller).
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -77,6 +84,25 @@ begin
 
 	w_cnt_done <= '1' when (w_cnt =0) else '0';
 
+	-- byte_ctrl_FSM describes the procedure for a master to acess a slave device
+	--1) if master wants to SEND data to slave (master transmitter)
+		--master sends START symbol/condition and address w. write flag to bus 
+		--master sends data to bus
+		--master terminates the transaction (possibly after multiple data messages) with STOP symbol
+
+		--fsm paths:
+			--IDLE->START->WRITE->ACK->STOP
+			--IDLE->START->WRITE->ACK->IDLE->(REPEATED) START->......->STOP
+	--2) if masster wants to RECEIVE data from slave (master receiver)
+		--master sends START symbol/condition and address w. read flag to bus 
+		--(master sends the register/address to read from)
+		--master reads data from the bus
+		--master terminates the transaction with STOP symbol
+
+		--fsm paths:
+			--IDLE->START->READ->ACK->STOP
+			--IDLE->START->READ->ACK->IDLE->(REPEATED) START->......->STOP
+			
 	byte_ctrl_FSM : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then
@@ -151,6 +177,7 @@ begin
 								w_state <= STOP;
 								o_cmd <= CMD_STOP;
 							else
+							--repeated start condition
 								w_state <= IDLE;
 								o_cmd <= CMD_NOP;
 								o_msg_done <= '1';

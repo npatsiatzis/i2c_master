@@ -110,6 +110,10 @@ begin
 	--drive to 1 to avoid issues with cocotb simulation
 	io_scl <= w_scl when (w_scl_en_n = '0') else '1';
 	io_sda <= w_sda when (w_sda_en_n = '0') else '1';
+
+	--because I2C is open-drain, scl and sda can basically be driven by a 
+	--tri-state buffer with (scl/sda)_en_n as a control input and '0' as a data input.
+	--the output of each of these buffers is scl/sda respectively.
 	--io_scl <= w_scl when (w_scl_en_n = '0') else 'Z';
 	--io_sda <= w_sda when (w_sda_en_n = '0') else 'Z';
 end rtl;
