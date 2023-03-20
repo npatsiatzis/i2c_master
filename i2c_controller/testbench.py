@@ -23,7 +23,7 @@ async def slave_read_sda(dut,recv_array):
 		await RisingEdge(dut.i_clk)
 		if(int(dut.i2c_byte_controller.w_cnt.value) >0 and dut.i2c_byte_controller.w_state ==4 and dut.i2c_bit_controller.w_scl.value == 1 and dut.i2c_bit_controller.w_scl_r.value == 0):
 			recv_array[int(dut.i2c_byte_controller.w_cnt.value)] = dut.io_sda.value
-		elif(dut.i2c_byte_controller.w_cnt.value == 0):
+		elif(int(dut.i2c_byte_controller.w_cnt.value) == 0 and dut.i2c_byte_controller.w_state ==4 and dut.i2c_bit_controller.w_scl.value == 1 and dut.i2c_bit_controller.w_scl_r.value == 0):
 			recv_array[0] = dut.io_sda.value
 			s = ""
 			for i in recv_array:
@@ -86,13 +86,10 @@ async def test_tx(dut):
 	
 
 
-
-	# configure UART core via interface
-	# set databits(8), stopbits(1), parity_en(1), parity_type etc..
-
 	dut.i_addr.value = 0
 	dut.i_we.value = 1
-	dut.i_data.value = 10 		#lsbyte of scl clock cycles
+	dut.i_data.value = 20 		#lsbyte of scl clock cycles (e.g Fsys = 100 MHz Fi2c = 1MHz, F = 100/(5*1) = 20)
+								#F is the frequency of the clock in i2c_bit_controller that generates scl
 
 	await RisingEdge(dut.i_clk)
 

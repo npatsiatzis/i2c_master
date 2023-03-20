@@ -84,6 +84,15 @@ begin
 	end process; -- delayed_scl_en
 
 	--prepare the edge transitions of the serial clock line according to the required baud rate
+	--to create all the events are required within a single scl cycle, we clearly need another (faster) clock.
+	--called x_scl, where Fx_scl = x * Fi2c. The value of x corresponds to the implementation of events that constitute
+	--one serial clock cycle, and the calculation for this specific case is drescribed below.
+
+	--as seen in gen_scl_sda FSM, the serial clock's length is given by the distance (in cycles)
+	--write3(posdge scl)->...->write3(posedge scl) and read3(posedge scl)->...->read3(posedge scl) respectively 
+	--which is 5 cycles long.Given the desired frequency of the i2c's serial clock
+	--and the system clock frequency, the frequency of this clock that manages the FSM we have : 
+	--Fx_scl = Fsys/(5*Fi2c). If the implementation of the read/write symbols changes, this value has to be adapted 
 
 	gen_scl : process(i_clk,i_arstn) is
 	begin
@@ -91,7 +100,7 @@ begin
 			w_scl_cnt <= (others => '0');
 			w_scl_edge_rdy <= '1';
 		elsif (rising_edge(i_clk)) then
-			if(w_scl_cnt = unsigned(i_scl_cycles) or i_en = '0') then
+			if(w_scl_cnt = unsigned(i_scl_cycles)-1 or i_en = '0') then
 				w_scl_cnt <= (others => '0');
 				w_scl_edge_rdy <='1';
 			elsif (w_wait = '1') then
@@ -166,7 +175,7 @@ begin
 	o_sda <= '0';
 
 
-	gen_scl_en : process(i_clk,i_arstn) is
+	gen_scl_sda : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then
 			w_state <= IDLE;
@@ -197,51 +206,50 @@ begin
 									w_state <= IDLE;
 							end case;
 		                -- generate START symbol
-		                --	      1 | 2 | 3 | 4 |
+		                --	      1 | 2 | 3 | 4 | 5
 		                --        _______
-		                -- sda           \_______
-		                --        ___________
-		                -- scl               \___
+		                -- sda           \___________
+		                --        _______________
+		                -- scl                   \___
 		                --
 
 		                -- generate REPEATED START symbol
-		                --	         1 | 2 | 3 | 4 |
+		                --	         1 | 2 | 3 | 4 | 5
 		                --       	   ______
-		                -- sda     ___/   	 \____
-		                --               ________
-		                -- scl    ______/        \___
+		                -- sda     ___/   	 \__________
+		                --               ___________
+		                -- scl    ______/           \___
 		                --
 
+		                --the implementation of the (repeated) START symbol
+		                --does not affect F, F = Fsys/(5*Fi2c).
 						when START1 =>
 							w_state <= START2;
 							o_sda_en_n <= '1';
 						when START2 =>
 							w_state <= START3;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '1';
 						when START3 =>
 							w_state <= START4;
-							o_scl_en_n <= '1';
 							o_sda_en_n <= '0';
 						when START4 =>
 							w_state <= START5;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '0';
 						when START5 =>
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
-							o_sda_en_n <= '0';
-			
 							o_cmd_done <= '1';
 
 		                -- generate STOP symbol
 		                --	       1 | 2 | 3 | 4 |
-		                --       		    _____
-		                -- sda     ________/   
+		                --       		       ___
+		                -- sda     ___________/   
 		                --              ________
 		                -- scl    _____/
 		                --
 
+		                --the implementation of the STOP symbol 
+		                --does not affect F, F = Fsys/(5*Fi2c).
 						when STOP1 =>	
 							w_state <= STOP2;
 							o_scl_en_n <= '0';
@@ -249,14 +257,10 @@ begin
 						when STOP2 =>
 							w_state <= STOP3;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '0';
 						when STOP3 =>
 							w_state <= STOP4;
-							o_scl_en_n <= '1';
-							o_sda_en_n <= '0';
 						when STOP4 =>
 							w_state <= IDLE;
-							o_scl_en_n <= '1';
 							o_sda_en_n <= '1';
 							o_cmd_done <= '1';
 
@@ -264,12 +268,14 @@ begin
 		                -- generate READ symbol
 		                --	       1 | 2 | 3 | 4 |
 		                --       
-		                -- sda     XX============XX   
+		                -- sda     S=============
 		                --             _______
 		                -- scl    ____/       \___
 		                --
 
 
+		                --the implementation of the READ symbol
+		                --affects F, F = Fsys/(5*Fi2c).
 						when READ1 =>
 							w_state <= READ2;
 							o_scl_en_n <= '0';
@@ -277,27 +283,25 @@ begin
 						when READ2 =>
 							w_state <= READ3;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '1';
 						when READ3 =>
 							w_state <= READ4;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '1';
 						when READ4 =>
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
-							o_sda_en_n <= i_rx;
-						
 							o_cmd_done <= '1';
 
 	                -- generate WRITE symbol
 		                --	       1 | 2 | 3 | 4 |
 		                --       
-		                -- sda     X============X   
+		                -- sda     M============   
 		                --             _______
 		                -- scl    ____/       \___
 		                --
 
 
+		                --the implementation of the WRITE symbol
+		                --affects F, F = Fsys/(5*Fi2c).
 						when WRITE1 =>
 							w_state <= WRITE2;
 							o_scl_en_n <= '0';
@@ -305,15 +309,12 @@ begin
 						when WRITE2 =>
 							w_state <= WRITE3;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= i_rx;
 						when WRITE3 =>
 							w_state <= WRITE4;
 							o_scl_en_n <= '1';
-							o_sda_en_n <= '0';
 						when WRITE4 =>
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
-							o_sda_en_n <= i_rx;
 							o_cmd_done <= '1';
 						when others =>
 
@@ -322,7 +323,7 @@ begin
 				end if;
 			end if;
 		end if;
-	end process; -- gen_scl_en
+	end process; -- gen_scl_sda
 
 	--output received bits from the serial data line
 	tx_sda : process(i_clk,i_arstn) is
