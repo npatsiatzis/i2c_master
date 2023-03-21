@@ -20,13 +20,13 @@ entity i2c_byte_controller is
 			i_rd : in std_ulogic;
 			i_wr : in std_ulogic;
 			i_stop : in std_ulogic;
-			i_scl_cycles : in std_ulogic_vector(15 downto 0);
 			i_ack : in std_ulogic;
 			i_data : in std_ulogic_vector(7 downto 0);
 			o_data : out std_ulogic_vector(7 downto 0);
 
 			i_al : in std_ulogic;
 			o_msg_done : out std_ulogic;
+			o_tip : out std_ulogic;
 			o_ack : out std_ulogic;
 
 			i_cmd_done : in std_ulogic;
@@ -52,7 +52,26 @@ architecture rtl of i2c_byte_controller is
 	signal w_cnt : unsigned(2 downto 0);
 	signal w_cnt_done : std_ulogic;
 
+	signal r_start, r_stop, r_read, r_write : std_ulogic;
+	signal w_start, w_stop, w_read, w_write : std_ulogic;
+
 begin
+
+	reg_control_signals : process(i_clk,i_arstn) is
+	begin
+		if(i_arstn = '0') then
+			r_start <= '0'; 
+			r_stop <= '0';
+			r_read <= '0';
+			r_write <= '0';
+		elsif (rising_edge(i_clk)) then
+			r_start <= i_start;
+			r_stop <= i_stop;
+			r_read <= i_rd;
+			r_write <= i_wr;
+		end if;
+	end process; -- reg_control_signals
+
 	manage_data_flow_proc : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then
@@ -113,6 +132,7 @@ begin
 			o_tx <= '0';
 			o_msg_done <= '0';
 			o_ack <= '0';
+			o_tip <= '0';
 		elsif(rising_edge(i_clk)) then
 			if(i_al = '1') then
 				w_state <= IDLE;
@@ -121,6 +141,7 @@ begin
 				w_shift <= '0';
 				o_tx <= '0';
 				o_msg_done <= '0';
+				o_tip <= '0';
 				o_ack <= '0';	
 			else
 				o_tx <= w_sr(w_sr'high);
@@ -129,20 +150,28 @@ begin
 				o_msg_done <= '0';
 				case w_state is 
 					when IDLE =>
-						if(i_start = '1') then
+						if(w_start = '1') then
 							w_state <= START;
 							o_cmd <= CMD_START;
-						elsif(i_rd = '1') then
+							o_tip <= '1';
+						elsif(w_read = '1') then
 							w_state <= READ;
 							o_cmd <= CMD_READ;
-						elsif(i_wr = '1') then
+							o_tip <= '1';
+						elsif(w_write = '1') then
 							w_state <= WRITE;
 							o_cmd <= CMD_WRITE;
+							o_tip <= '1';
+						else
+							w_start <= r_start;
+							w_stop <= r_stop;
+							w_read <= r_read;
+							w_write <= r_write;
 						end if;
 						w_load <= '1';
 					when START =>
 						if(i_cmd_done = '1') then
-							if(i_rd = '1') then
+							if(w_read = '1') then
 								w_state <= READ;
 								o_cmd <= CMD_READ;
 							else
@@ -173,7 +202,7 @@ begin
 						end if;
 					when ACK =>
 						if(i_cmd_done = '1') then
-							if(i_stop = '1') then
+							if(w_stop = '1') then
 								w_state <= STOP;
 								o_cmd <= CMD_STOP;
 							else
@@ -181,6 +210,12 @@ begin
 								w_state <= IDLE;
 								o_cmd <= CMD_NOP;
 								o_msg_done <= '1';
+								o_tip <= '0';
+
+								w_start <= r_start;
+								w_stop <= r_stop;
+								w_read <= r_read;
+								w_write <= r_write;
 							end if;
 							o_ack <= i_rx;
 							o_tx <= '1';
@@ -190,6 +225,12 @@ begin
 							w_state <= IDLE;
 							o_cmd <= CMD_NOP;
 							o_msg_done <= '1';
+							o_tip <= '0';
+
+							w_start <= r_start;
+							w_stop <= r_stop;
+							w_read <= r_read;
+							w_write <= r_write;
 						end if;
 					when others =>
 						null;

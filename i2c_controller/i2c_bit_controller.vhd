@@ -41,12 +41,13 @@ architecture rtl of i2c_bit_controller is
 	signal w_sda, w_sda_r : std_ulogic;
 	signal w_scl_en_n_r : std_ulogic;
 	signal w_wait : std_ulogic;
+	signal w_sda_check : std_ulogic;
 
 	signal w_scl_cnt : unsigned(15 downto 0);
 	signal w_scl_edge_rdy : std_ulogic;
 
 	signal w_start, w_stop : std_ulogic;
-	signal w_stop_issued : std_ulogic;
+	signal r_stop_issued,w_stop_issued : std_ulogic;
 	--signal i_cmd : std_ulogic_vector(3 downto 0);
 
 	type t_state is (IDLE,START1,START2,START3,START4,START5,
@@ -143,12 +144,12 @@ begin
 	gen_in_state_stop : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then
-			w_stop_issued <= '0';
+			r_stop_issued <= '0';
 		elsif (rising_edge(i_clk)) then
 			if(i_cmd = CMD_STOP) then
-				w_stop_issued <= '1';
+				r_stop_issued <= '1';
 			else
-				w_stop_issued <= '0';
+				r_stop_issued <= '0';
 			end if;
 		end if;
 	end process; -- gen_in_state_stop
@@ -160,7 +161,7 @@ begin
 		if(i_arstn = '0') then
 			o_al <= '0';
 		elsif(rising_edge(i_clk)) then
-			if((w_sda = '0' and o_sda_en_n='1') or (w_state /= IDLE and w_stop_issued = '0' and w_stop ='1')) then
+			if((w_sda_check = '1' and (w_sda = '0' and o_sda_en_n='1')) or (w_state /= IDLE and w_stop_issued = '0' and w_stop ='1')) then
 				o_al <= '1';
 			else
 				o_al <= '0';
@@ -182,14 +183,21 @@ begin
 			o_scl_en_n <= '1';
 			o_sda_en_n <= '1';
 			o_cmd_done <= '0';
+			w_sda_check <= '0';
+
+			w_stop_issued <= '0';
 		elsif (rising_edge(i_clk)) then
 			if(o_al ='1') then
 				w_state <= IDLE;
 				o_scl_en_n <= '1';
 				o_sda_en_n <= '1';
 				o_cmd_done <= '0';
+				w_sda_check <= '0';
+
+				w_stop_issued <= '0';
 			else
 				o_cmd_done <= '0';
+				w_sda_check <= '0';
 				if(w_scl_edge_rdy = '1') then
 					case w_state is 
 						when IDLE =>
@@ -239,6 +247,7 @@ begin
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
 							o_cmd_done <= '1';
+							w_stop_issued <= r_stop_issued;
 
 		                -- generate STOP symbol
 		                --	       1 | 2 | 3 | 4 |
@@ -263,6 +272,7 @@ begin
 							w_state <= IDLE;
 							o_sda_en_n <= '1';
 							o_cmd_done <= '1';
+							w_stop_issued <= r_stop_issued;
 
 
 		                -- generate READ symbol
@@ -290,6 +300,7 @@ begin
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
 							o_cmd_done <= '1';
+							w_stop_issued <= r_stop_issued;
 
 	                -- generate WRITE symbol
 		                --	       1 | 2 | 3 | 4 |
@@ -309,15 +320,17 @@ begin
 						when WRITE2 =>
 							w_state <= WRITE3;
 							o_scl_en_n <= '1';
+							w_sda_check <= '1';
 						when WRITE3 =>
 							w_state <= WRITE4;
 							o_scl_en_n <= '1';
+							w_sda_check <= '1';
 						when WRITE4 =>
 							w_state <= IDLE;
 							o_scl_en_n <= '0';
 							o_cmd_done <= '1';
+							w_stop_issued <= r_stop_issued;
 						when others =>
-
 							null;
 					end case;
 				end if;

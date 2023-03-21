@@ -31,6 +31,19 @@ async def slave_read_sda(dut,recv_array):
 			recv = BinaryValue(value=s,binaryRepresentation=0)
 
 
+
+async def slave_write_sda(dut,recv_array):
+	# pass
+	global full
+	# global recv
+	while (full != True):
+		await RisingEdge(dut.i_clk)
+		if(int(dut.i2c_byte_controller.w_cnt.value) >0 and dut.i2c_byte_controller.w_state ==3 and dut.i2c_bit_controller.w_scl.value == 0 and dut.i2c_bit_controller.w_scl_r.value == 0):
+			dut.f_sda.value = recv_array[int(dut.i2c_byte_controller.w_cnt.value)]
+		elif(int(dut.i2c_byte_controller.w_cnt.value) == 0 and dut.i2c_byte_controller.w_state ==3 and dut.i2c_bit_controller.w_scl.value == 0 and dut.i2c_bit_controller.w_scl_r.value == 0):
+			dut.f_sda.value = recv_array[0]
+		elif(dut.i2c_byte_controller.w_state !=3):
+			dut.f_sda.value = 1
 async def connect_tx_rx(dut):
 	while full != True:
 		await RisingEdge(dut.i_clk)
@@ -57,6 +70,7 @@ async def reset(dut,cycles=1):
 async def test_tx(dut):
 	"""Check results and coverage for i2c controller transmission"""
 	data_rx = [0]*8
+	idx = 0
 
 	global recv
 
@@ -64,6 +78,7 @@ async def test_tx(dut):
 	await reset(dut,5)	
 	cocotb.start_soon(connect_tx_rx(dut))
 	cocotb.start_soon(slave_read_sda(dut,data_rx))
+	cocotb.start_soon(slave_write_sda(dut,data_rx))
 
 
 	expected_value = 0
@@ -78,12 +93,16 @@ async def test_tx(dut):
 	# how to write data to slave
 	# set slave address and read/write(0) bit to transmit register (txr)(3)
 	# set the start and write fields in command register (cr)(4) , make sure the cmd is done(msg_done)
-	# set slave address in txr 
+	# set in-slave  memory/register address in txr 
 	# set the write bit in command register and wait for the cmd to be done
 	# set the data to be transferred in txr 
 	# set the write bit in command register and wait for the cmd to be done
 	# repeat the last two steps as longs as one wants to transmit data
 	
+	#how to read data to slave
+	# the procedure is simplified here to just issuing a read command by setting the 
+	# read bit in command register and sending it over the bus. normally both the slave address
+	# and the in-slave register/memory address have to be first exchanged as well.
 
 
 	dut.i_addr.value = 0
@@ -95,61 +114,92 @@ async def test_tx(dut):
 
 	dut.i_addr.value = 1
 	dut.i_we.value = 1
-	dut.i_data.value = 0 		#msbyte of scl clock cycles
+	dut.i_data.value = 0 				#msbyte of scl clock cycles
 
 	await RisingEdge(dut.i_clk)
 
-	dut.i_addr.value = 2
+	dut.i_addr.value = 2				#enable the core (wen for bit_controller)
 	dut.i_we.value = 1
 	dut.i_data.value = 128  #(x80)
 
 	await RisingEdge(dut.i_clk)
 
-	dut.i_addr.value = 3
-	dut.i_we.value =1
-	dut.i_data.value = 1
-
-	await RisingEdge(dut.i_clk)
-
-	dut.i_addr.value = 4
-	dut.i_we.value = 1
-	dut.i_data.value = 144  #(x90)
-
-	await RisingEdge(dut.i2c_byte_controller.o_msg_done)
-
-	dut.i_addr.value = 3
-	dut.i_we.value =1
-	dut.i_data.value = 0
-
-	await RisingEdge(dut.i_clk)
-
-	dut.i_addr.value = 4
-	dut.i_we.value = 1
-	dut.i_data.value = 16  #(x10)
-	
-	await RisingEdge(dut.i2c_byte_controller.o_msg_done)
-
 	while(full != True):
-		data = random.randint(0,2**4-1)
-		while(data in covered_valued):
-			data = random.randint(0,2**4-1)
-		dut.i_addr.value = 3
+
+		dut.i_addr.value = 3				#write txr
 		dut.i_we.value =1
-		dut.i_data.value = data
+		dut.i_data.value = 0 				#7 bit address, '1' (read from slave) / '0' (write to slave)
 
 		await RisingEdge(dut.i_clk)
 
 		dut.i_addr.value = 4
 		dut.i_we.value = 1
-		dut.i_data.value = 16  #(x10)
+		dut.i_data.value = 144  #(x90) 		#START condition, WRITE condition
 
+		if(idx >0):
+			await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
+			#check that the rx part of the master works correctly 
+			assert not (data != dut.w_data.value),"Different expected to actual read data"
+
+		await RisingEdge(dut.w_tip)
+
+
+		dut.i_addr.value = 3
+		dut.i_we.value =1
+		dut.i_data.value = 0 				# set in-slave register/memory address
+
+		await RisingEdge(dut.i_clk)
+
+		dut.i_addr.value = 4
+		dut.i_we.value = 1
+		dut.i_data.value = 16  #(x10)		#WRITE condition
+		await RisingEdge(dut.i_clk)
+
+		#wait for write of address an r/w bit to be done
+		await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
+
+		await RisingEdge(dut.w_tip)
+		
+
+		# while(full != True):
+			
+		data = random.randint(0,2**4-1)
+		while(data in covered_valued):
+			data = random.randint(0,2**4-1)
+		dut.i_addr.value = 3
+		dut.i_we.value =1
+		dut.i_data.value = data 		#set data to be written to previosuly provided address
+
+		await RisingEdge(dut.i_clk)
+
+		dut.i_addr.value = 4
+		dut.i_we.value = 1
+		# dut.i_data.value = 16  #(x10) 		#WRITE condition
+		dut.i_data.value = 86  #(x50) 		#WRITE condition, STOP condition
+		await RisingEdge(dut.i_clk)
+
+		#wait for write of in-slave register/memory address to be done
 		await RisingEdge(dut.i2c_byte_controller.o_msg_done)
+
+
+
+		await RisingEdge(dut.w_tip)
+
+		dut.i_addr.value = 4
+		dut.i_we.value = 1
+		dut.i_data.value = 224  #(xe0)
+		await RisingEdge(dut.i_clk)
+		
+		await RisingEdge(dut.i2c_byte_controller.o_msg_done)
+
+
 		# check that the data received by a trivial i2c receiver logic matches
 		# the transmitted data
 		assert not (recv.integer != data),"Different expected to actual read data"
 		coverage_db["top.i_data"].add_threshold_callback(notify, 100)
 		number_cover(data)
-		
+		idx +=1
+
 
 	coverage_db.report_coverage(cocotb.log.info,bins=True)
 	coverage_db.export_to_xml(filename="coverage.xml")
