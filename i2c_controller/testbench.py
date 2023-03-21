@@ -16,7 +16,6 @@ def notify():
 	full = True
 
 async def slave_read_sda(dut,recv_array):
-	# pass
 	global full
 	global recv
 	while (full != True):
@@ -33,9 +32,7 @@ async def slave_read_sda(dut,recv_array):
 
 
 async def slave_write_sda(dut,recv_array):
-	# pass
 	global full
-	# global recv
 	while (full != True):
 		await RisingEdge(dut.i_clk)
 		if(int(dut.i2c_byte_controller.w_cnt.value) >0 and dut.i2c_byte_controller.w_state ==3 and dut.i2c_bit_controller.w_scl.value == 0 and dut.i2c_bit_controller.w_scl_r.value == 0):
@@ -44,10 +41,6 @@ async def slave_write_sda(dut,recv_array):
 			dut.f_sda.value = recv_array[0]
 		elif(dut.i2c_byte_controller.w_state !=3):
 			dut.f_sda.value = 1
-async def connect_tx_rx(dut):
-	while full != True:
-		await RisingEdge(dut.i_clk)
-		# dut.f_sda.value = dut.io_sda.value
 
 # at_least = value is superfluous, just shows how you can determine the amount of times that
 # a bin must be hit to considered covered
@@ -68,7 +61,7 @@ async def reset(dut,cycles=1):
 
 @cocotb.test()
 async def test_tx(dut):
-	"""Check results and coverage for i2c controller transmission"""
+	"""Check results and coverage for i2c controller transmission and reception"""
 	data_rx = [0]*8
 	idx = 0
 
@@ -76,7 +69,6 @@ async def test_tx(dut):
 
 	cocotb.start_soon(Clock(dut.i_clk, 10, units="ns").start())
 	await reset(dut,5)	
-	cocotb.start_soon(connect_tx_rx(dut))
 	cocotb.start_soon(slave_read_sda(dut,data_rx))
 	cocotb.start_soon(slave_write_sda(dut,data_rx))
 
