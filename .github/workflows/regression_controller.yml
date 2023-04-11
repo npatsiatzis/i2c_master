@@ -40,9 +40,9 @@ jobs:
     
     - name: regression
       run: |
-        cd i2c_controller/ && make
+        cd cocotb_sim/ && make
       
     - name: Functional Coverage
       run: |
-        cd i2c_controller/ && var=$(cat results.xml | grep -o -E 'failure' | head -1 | cut -f2- -d\")
+        cd cocotb_sim/ && var=$(cat results.xml | grep -o -E 'failure' | head -1 | cut -f2- -d\")
         if [ "$var" = "failure" ]; then exit 1; else exit 0; fi
