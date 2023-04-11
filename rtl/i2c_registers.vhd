@@ -29,6 +29,15 @@ end i2c_registers;
 
 architecture rtl of i2c_registers is
 begin
+	-- 					REGISTER MAP
+
+	-- 			Address 		| 		Functionality
+	--			   0 			|	system clock cycles to make scl (lower byte)
+	--			   1 			|	system clock cycles to make scl (upper byte)
+	--			   2 			|	control transfer register (ctr)
+	--			   3 			|	data transfer register (i_we = '1')/ receive i2c data register (i_we = '0') 
+
+
 	fill_regs : process(i_clk,i_arstn) is
 	begin
 		if(i_arstn = '0') then

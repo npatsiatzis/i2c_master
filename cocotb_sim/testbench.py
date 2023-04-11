@@ -79,6 +79,17 @@ async def test_tx(dut):
 
 	dut.i_addr.value = 0
 
+		# 					REGISTER MAP
+
+	# 			Address 		| 		Functionality
+	#			   0 			|	system clock cycles to make scl (lower byte)
+	#			   1 			|	system clock cycles to make scl (upper byte)
+	#			   2 			|	control transfer register (ctr)
+	#			   3 			|	data transfer register (i_we = '1')/ receive i2c data register (i_we = '0') 
+
+
+
+
 	# initialization
 	# set the enable bit of control regsiter(ctr)(02) 
 	# write the upper and lower part of the value required for the scl period to registers 0 and 1
