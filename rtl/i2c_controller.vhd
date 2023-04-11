@@ -1,5 +1,6 @@
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity i2c_controller is
 	port (
@@ -36,6 +37,7 @@ architecture rtl of i2c_controller is
 	signal w_scl_en_n, w_sda_en_n : std_ulogic;
 
 	signal f_in_transaction : std_ulogic;
+	signal f_is_data_to_tx : std_ulogic;
 begin
 	w_start <= w_cr(7);
 	w_stop <= w_cr(6);
@@ -46,6 +48,7 @@ begin
 	w_en <= w_ctr(7);
 
 	f_in_transaction <= w_cr(5) or w_cr(4);
+	f_is_data_to_tx <= '1' when(i_we = '1' and i_stb = '1' and  i_addr  = "011" and unsigned(i_data) > 15) else '0';
 
 	i2c_byte_controller : entity work.i2c_byte_controller(rtl)
 	port map(

@@ -44,7 +44,7 @@ async def slave_write_sda(dut,recv_array):
 
 # at_least = value is superfluous, just shows how you can determine the amount of times that
 # a bin must be hit to considered covered
-@CoverPoint("top.i_data",xf = lambda x : x, bins = list(range(2**4)), at_least=1)
+@CoverPoint("top.i_data",xf = lambda x : x, bins = list(range(2**4,2**5)), at_least=1)
 def number_cover(x):
 	covered_valued.append(int(x))
 
@@ -181,9 +181,9 @@ async def test_tx(dut):
 
 		# while(full != True):
 			
-		data = random.randint(0,2**4-1)
+		data = random.randint(2**4,2**5)
 		while(data in covered_valued):
-			data = random.randint(0,2**4-1)
+			data = random.randint(2**4,2**5)
 		dut.i_addr.value = 3
 		dut.i_stb.value = 1
 		dut.i_we.value =1

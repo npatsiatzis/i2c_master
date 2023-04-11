@@ -55,6 +55,8 @@ architecture rtl of i2c_byte_controller is
 	signal r_start, r_stop, r_read, r_write : std_ulogic;
 	signal w_start, w_stop, w_read, w_write : std_ulogic;
 
+	signal f_wr_done : std_ulogic;
+
 begin
 
 	reg_control_signals : process(i_clk,i_arstn) is
@@ -133,6 +135,7 @@ begin
 			o_msg_done <= '0';
 			o_ack <= '0';
 			o_tip <= '0';
+			f_wr_done <= '0';
 		elsif(rising_edge(i_clk)) then
 			if(i_al = '1') then
 				w_state <= IDLE;
@@ -143,11 +146,15 @@ begin
 				o_msg_done <= '0';
 				o_tip <= '0';
 				o_ack <= '0';	
+
+				f_wr_done <= '0';
 			else
 				o_tx <= w_sr(w_sr'high);
 				w_load <= '0';
 				w_shift <= '0';
 				o_msg_done <= '0';
+
+				f_wr_done <= '0';
 				case w_state is 
 					when IDLE =>
 						if(w_start = '1') then
@@ -185,6 +192,7 @@ begin
 							if(w_cnt_done) then
 								w_state <= ACK;
 								o_cmd <= CMD_READ;
+								f_wr_done <= '1';
 							else
 								w_shift <= '1';
 							end if;
