@@ -50,7 +50,8 @@ def number_cover(x):
 
 async def reset(dut,cycles=1):
 	dut.i_arstn.value = 0
-	dut.i_we.value = 0 
+	dut.i_we.value = 0
+	dut.i_stb. value = 0 
 	dut.i_data.value = 0
 	dut.i_addr.value = 0
 
@@ -98,6 +99,7 @@ async def test_tx(dut):
 
 
 	dut.i_addr.value = 0
+	dut.i_stb.value = 1
 	dut.i_we.value = 1
 	dut.i_data.value = 20 		#lsbyte of scl clock cycles (e.g Fsys = 100 MHz Fi2c = 1MHz, F = 100/(5*1) = 20)
 								#F is the frequency of the clock in i2c_bit_controller that generates scl
@@ -105,12 +107,14 @@ async def test_tx(dut):
 	await RisingEdge(dut.i_clk)
 
 	dut.i_addr.value = 1
+	dut.i_stb.value = 1
 	dut.i_we.value = 1
 	dut.i_data.value = 0 				#msbyte of scl clock cycles
 
 	await RisingEdge(dut.i_clk)
 
 	dut.i_addr.value = 2				#enable the core (wen for bit_controller)
+	dut.i_stb.value = 1
 	dut.i_we.value = 1
 	dut.i_data.value = 128  #(x80)
 
@@ -119,33 +123,44 @@ async def test_tx(dut):
 	while(full != True):
 
 		dut.i_addr.value = 3				#write txr
+		dut.i_stb.value = 1
 		dut.i_we.value =1
 		dut.i_data.value = 0 				#7 bit address, '1' (read from slave) / '0' (write to slave)
 
 		await RisingEdge(dut.i_clk)
 
 		dut.i_addr.value = 4
+		dut.i_stb.value = 1
 		dut.i_we.value = 1
 		dut.i_data.value = 144  #(x90) 		#START condition, WRITE condition
 
 		if(idx >0):
 			#check that the rx part of the master works correctly 
 			await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
+			dut.i_addr.value = 3
+			dut.i_stb.value = 1
+			dut.i_we.value = 0
+			await RisingEdge(dut.i_clk)
+			await RisingEdge(dut.i_clk)
 			assert not (data != dut.o_data.value),"Different expected to actual read data"
 
 		await RisingEdge(dut.w_tip)
 
 
 		dut.i_addr.value = 3
+		dut.i_stb.value = 1
 		dut.i_we.value =1
 		dut.i_data.value = 0 				# set in-slave register/memory address
 
 		await RisingEdge(dut.i_clk)
 
 		dut.i_addr.value = 4
+		dut.i_stb.value = 1
 		dut.i_we.value = 1
 		dut.i_data.value = 16  #(x10)		#WRITE condition
 		await RisingEdge(dut.i_clk)
+
+		# dut.i_stb.value = 0
 
 		#wait for write of address an r/w bit to be done
 		await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
@@ -159,12 +174,14 @@ async def test_tx(dut):
 		while(data in covered_valued):
 			data = random.randint(0,2**4-1)
 		dut.i_addr.value = 3
+		dut.i_stb.value = 1
 		dut.i_we.value =1
 		dut.i_data.value = data 		#set data to be written to previosuly provided address
 
 		await RisingEdge(dut.i_clk)
 
 		dut.i_addr.value = 4
+		dut.i_stb.value = 1
 		dut.i_we.value = 1
 		# dut.i_data.value = 16  #(x10) 		#WRITE condition
 		dut.i_data.value = 86  #(x50) 		#WRITE condition, STOP condition
@@ -178,6 +195,7 @@ async def test_tx(dut):
 		await RisingEdge(dut.w_tip)
 
 		dut.i_addr.value = 4
+		dut.i_stb.value = 1
 		dut.i_we.value = 1
 		dut.i_data.value = 224  #(xe0)	#START, READ, STOP conditions
 		await RisingEdge(dut.i_clk)

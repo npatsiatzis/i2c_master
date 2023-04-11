@@ -7,10 +7,12 @@ entity i2c_controller is
 			i_clk : in std_ulogic;
 			i_arstn : in std_ulogic;
 
-			--cpu (parallel) bus
+			--wishbone (slave) interface
 			i_we : in std_ulogic;
+			i_stb : in std_ulogic;
 			i_addr : in std_ulogic_vector(2 downto 0);
 			i_data : in std_ulogic_vector(7 downto 0);
+			o_ack : out std_ulogic;
 			o_data : out std_ulogic_vector(7 downto 0);
 
 			--i2c bus
@@ -23,6 +25,7 @@ architecture rtl of i2c_controller is
 	signal w_tx, w_rx : std_ulogic;
 	signal w_clk_cycles : std_ulogic_vector(15 downto 0);
 	signal w_txr, w_cr, w_ctr : std_ulogic_vector(7 downto 0);
+	signal w_rd_data : std_ulogic_vector(7 downto 0);
 	signal w_start, w_stop, w_rd, w_wr, w_ack_cr : std_ulogic;
 	signal w_en : std_ulogic;
 	signal w_cmd_done : std_ulogic;
@@ -54,7 +57,7 @@ begin
 		i_stop =>w_stop,
 		i_ack =>w_ack_cr,
 		i_data =>w_txr,
-		o_data =>o_data,
+		o_data =>w_rd_data,
 
 		i_al =>w_al,
 		o_msg_done =>w_msg_done,
@@ -94,7 +97,11 @@ begin
 		i_arstn =>i_arstn,
 		i_addr =>i_addr,
 		i_we =>i_we,
+		i_stb => i_stb,
 		i_data =>i_data,
+		i_i2c_rd_data => w_rd_data,
+		o_ack => o_ack,
+		o_data => o_data,
 
 		i_busy =>w_busy,
 		i_done =>w_msg_done,
