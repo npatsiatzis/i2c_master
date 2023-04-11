@@ -129,9 +129,9 @@ async def test_tx(dut):
 		dut.i_data.value = 144  #(x90) 		#START condition, WRITE condition
 
 		if(idx >0):
-			await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
 			#check that the rx part of the master works correctly 
-			assert not (data != dut.w_data.value),"Different expected to actual read data"
+			await RisingEdge(dut.i2c_byte_controller.o_msg_done) 
+			assert not (data != dut.o_data.value),"Different expected to actual read data"
 
 		await RisingEdge(dut.w_tip)
 
@@ -179,7 +179,7 @@ async def test_tx(dut):
 
 		dut.i_addr.value = 4
 		dut.i_we.value = 1
-		dut.i_data.value = 224  #(xe0)
+		dut.i_data.value = 224  #(xe0)	#START, READ, STOP conditions
 		await RisingEdge(dut.i_clk)
 		
 		await RisingEdge(dut.i2c_byte_controller.o_msg_done)

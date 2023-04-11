@@ -21,7 +21,6 @@ end i2c_controller;
 
 architecture rtl of i2c_controller is
 	signal w_tx, w_rx : std_ulogic;
-	signal w_data : std_ulogic_vector(7 downto 0);
 	signal w_clk_cycles : std_ulogic_vector(15 downto 0);
 	signal w_txr, w_cr, w_ctr : std_ulogic_vector(7 downto 0);
 	signal w_start, w_stop, w_rd, w_wr, w_ack_cr : std_ulogic;
@@ -55,7 +54,7 @@ begin
 		i_stop =>w_stop,
 		i_ack =>w_ack_cr,
 		i_data =>w_txr,
-		o_data =>w_data,
+		o_data =>o_data,
 
 		i_al =>w_al,
 		o_msg_done =>w_msg_done,
