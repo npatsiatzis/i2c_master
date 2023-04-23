@@ -56,6 +56,8 @@ class I2cBfm(metaclass=utility_classes.Singleton):
 
     async def data_mon_bfm(self):
         while True:
+            # await RisingEdge(self.dut.o_tx_ready)
+            # await RisingEdge(self.dut.i_addr == 3)
             await RisingEdge(self.dut.f_is_data_to_tx)
             i_data = self.dut.i_data.value 
 
@@ -64,6 +66,7 @@ class I2cBfm(metaclass=utility_classes.Singleton):
 
     async def result_mon_bfm(self):
         while True:
+            # await RisingEdge(self.dut.o_rx_ready)
             await RisingEdge(self.dut.f_is_data_to_tx)
             await FallingEdge(self.dut.i2c_byte_controller.o_msg_done)
             await RisingEdge(self.dut.i_clk)
